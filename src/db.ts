@@ -1,57 +1,59 @@
-import { promisify } from "util";
-// @ts-ignore does not have typings
-import jdbc from "jdbc";
-// @ts-ignore does not have typings
-import jinst from "jdbc/lib/jinst";
+import sqlite3 from "sqlite3";
 
-if (!jinst.isJvmCreated()) {
-  jinst.addOption("-Xrs");
-  jinst.setupClasspath(["h2-2.2.224.jar"]);
-}
-
-const h2 = new jdbc({
-  url: "jdbc:h2:mem:exoplanets;DB_CLOSE_DELAY=-1",
-  drivername: "org.h2.Driver",
-  properties: {
-    user: "SA",
-    password: "",
-  },
-});
+const db = new sqlite3.Database(":memory:");
 
 export async function initialize() {
-  await promisify(h2.initialize.bind(h2))();
-  await queryDB(
-    "CREATE TABLE IF NOT EXISTS movies (" +
-      "  id INT PRIMARY KEY AUTO_INCREMENT," +
-      "  release_year NUMBER," +
-      "  title VARCHAR," +
-      "  studios VARCHAR," +
-      "  producers VARCHAR," +
-      "  winner VARCHAR)"
-  );
+  return new Promise<void>((resolve, reject) => {
+    db.serialize(() => {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS movies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          release_year INTEGER,
+          title TEXT,
+          studios TEXT,
+          producers TEXT,
+          winner TEXT
+        )
+      `, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  });
 }
 
 export async function queryDB(sql: string) {
-  const connection = await promisify(h2.reserve.bind(h2))();
-  const statement = await promisify(
-    connection.conn.createStatement.bind(connection.conn)
-  )();
-  const result = await promisify(statement.execute.bind(statement))(sql);
-  await promisify(h2.release.bind(h2))(connection);
-  return result;
+  return new Promise<any[]>((resolve, reject) => {
+    db.all(sql, (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
 }
 
 export async function create(record: Record<string, any>) {
-  const columns = Object.keys(record).join(", ");
-  const values = Object.values(record).map((value) =>
-    typeof value === "string" ? `'${value.replace(/'/g, "''")}'` : value
-  );
-  
-  const sql = `INSERT INTO movies (${columns}) VALUES (${values.join(", ")});`;
+  return new Promise<void>((resolve, reject) => {
+    const keys = Object.keys(record).join(", ");
+    const values = Object.values(record).map((value) =>
+      typeof value === "string" ? `'${value.replace(/'/g, "''")}'` : value
+    );
 
-  await queryDB(sql);
+    const sql = `INSERT INTO movies (${keys}) VALUES (${values.join(", ")})`;
 
-  return record;
+    db.run(sql, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 export async function maxInterval() {
@@ -80,9 +82,7 @@ export async function maxInterval() {
     ORDER BY max_interval DESC
   `;
 
-  const result = await queryDB(sql);
-
-  return await promisify(result.toObjArray.bind(result))();
+  return queryDB(sql);
 }
 
 export async function minInterval() {
@@ -111,7 +111,5 @@ export async function minInterval() {
     ORDER BY min_interval ASC
   `;
 
-  const result = await queryDB(sql);
-
-  return await promisify(result.toObjArray.bind(result))();
+  return queryDB(sql);
 }

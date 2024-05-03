@@ -4,7 +4,7 @@
   "description": "",
   "main": "api.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --forceExit",
     "dev": "ts-node src/api.ts"
   },
   "keywords": [],
@@ -14,8 +14,8 @@
     "cors": "^2.8.5",
     "csv": "^6.3.8",
     "express": "^4.17.1",
-    "jdbc": "^0.7.1",
     "joi": "^17.1.1",
+    "sqlite3": "^5.1.7",
     "typescript": "^5.4.5"
   },
   "devDependencies": {
